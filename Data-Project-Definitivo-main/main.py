@@ -3,8 +3,8 @@ import psycopg2
 import pandas as pd
 import json 
 import psycopg2.extras as extras
-
-  
+import numpy
+ 
 #Copiamos url para descargar el json hospitales
 
 URL= 'https://valencia.opendatasoft.com/explore/dataset/hospitales/download/?format=json&timezone=Europe/Madrid&lang=es'
@@ -16,7 +16,6 @@ respuesta = requests.get(url=URL)
 datos=respuesta.json()
 
 df_hospitales = pd.json_normalize(datos)
-
 
 #Copiamos url para descargar el json espacios verdes
 
@@ -30,10 +29,6 @@ datos_espaciosverdes=respuesta.json()
 
 df_espacios_verdes = pd.json_normalize(datos_espaciosverdes)
 
-print(df_espacios_verdes)
-
-
-
 #Copiamos url para descargar el json barrios
 
 URL= 'https://valencia.opendatasoft.com/explore/dataset/barris-barrios/download/?format=json&timezone=Europe/Berlin&lang=es'
@@ -46,30 +41,22 @@ datos_barrios=respuesta.json()
 
 df_barrios = pd.json_normalize(datos_barrios)
 
-print(df_barrios)
+#Copiamos url para descargar el json Transporte
 
+URL= 'https://valencia.opendatasoft.com/explore/dataset/transporte-barrios/download/?format=json&timezone=Europe/Madrid&lang=es'
 
-
-
-
-
-
-#Copiamos url para descargar el json cargadores electricos
-
-URL= 'https://valencia.opendatasoft.com/explore/dataset/carregadors-vehicles-electrics-cargadores-vehiculos-electricos/download/?format=json&timezone=Europe/Berlin&lang=es'
-
-#Obtenemos json cargadores electricos y transformamos a datafarme
+#Obtenemos json Transporte y transformamos a datafarme
 
 respuesta = requests.get(url=URL)
 
-datos_cargadores=respuesta.json()
+datos_transporte=respuesta.json()
 
-df_cargadores = pd.json_normalize(datos_cargadores)
+df_transporte = pd.json_normalize(datos_transporte)
 
+#LEER CSV SUPERFICIE
 
-
-
-
+df_superficie = pd.read_csv('Superficie.csv', sep=';')
+print(df_superficie)
 
 #CONEXION A POSTGREESQL
 
@@ -82,7 +69,7 @@ cursor.execute(
   """
     CREATE TABLE IF NOT EXISTS hospitales(
     nombre varchar(50),
-    coddistrit integer,
+    coddistrit varchar(50),
     x varchar(50),
     y varchar(50));
     
@@ -93,7 +80,7 @@ cursor.execute(
 cursor.execute(
   """
     CREATE TABLE IF NOT EXISTS espaciosverdes(
-    nombre varchar(50),
+    nombre varchar(100),
     barrio varchar(50));
     
   """
@@ -109,15 +96,25 @@ cursor.execute(
   """
 )
 
-#Crear tabla cargadores electricos
+#Crear tabla Transporte
 cursor.execute(
   """
-    CREATE TABLE IF NOT EXISTS cargadores(
-    datasetid varchar(50),
-    distrito integer);
+    CREATE TABLE IF NOT EXISTS Transporte(
+    nombre varchar(50),
+    coddistrit varchar(50));
     
   """
-)
+) 
+
+#Crear tabla Superficie
+cursor.execute(
+  """
+    CREATE TABLE IF NOT EXISTS Superficie(
+    coddistrit varchar(50),
+    superficie float);
+    
+  """
+) 
 
 #Insertar datos en tabla hospitales
 for i in range(len(df_hospitales)):  
@@ -131,28 +128,29 @@ connection.commit()
 #Insertar datos en tabla espacios verdes
 for i in range(len(df_espacios_verdes)):  
 
-  postgres_insert_query1 = """ INSERT INTO espaciosverdes (nombre,barrio) VALUES (%s,%s)"""
-  record_to_insert = (df_espacios_verdes['fields.nombre'][i],df_espacios_verdes['fields.barrio'])
+  postgres_insert_query = """ INSERT INTO espaciosverdes (nombre,barrio) VALUES (%s,%s)"""
+  record_to_insert = (df_espacios_verdes['fields.nombre'][i],df_espacios_verdes['fields.barrio'][i])
   cursor.execute(postgres_insert_query, record_to_insert)
 connection.commit()
 
 #Insertar datos en tabla barrios
 for i in range(len(df_barrios)):  
 
-  postgres_insert_query1 = """ INSERT INTO barrios (nombre,coddistrit) VALUES (%s,%s)"""
-  record_to_insert1 = (df_barrios['fields.nombre'][i],df_barrios['fields.coddistrit'])
-  cursor.execute(postgres_insert_query1, record_to_insert1)
+  postgres_insert_query = """ INSERT INTO barrios (nombre,barrio) VALUES (%s,%s)"""
+  record_to_insert1 = (df_barrios['fields.nombre'][i],df_barrios['fields.coddistrit'][i])
+  cursor.execute(postgres_insert_query, record_to_insert1)
 connection.commit()
 
-#Insertar datos en tabla cargadores electricos
-for i in range(len(df_cargadores)):  
+#Insertar datos en tabla Transporte
+for i in range(len(df_transporte)):  
 
-  postgres_insert_query = """ INSERT INTO cargadores (datasetid,distrito) VALUES (%s,%s)"""
-  record_to_insert = (df_cargadores['datasetid'][i],df_cargadores['fields.distrito'][i])
-  cursor.execute(postgres_insert_query, record_to_insert)
+  postgres_insert_query = """ INSERT INTO Transporte (nombre,coddistrit) VALUES (%s,%s)"""
+  record_to_insert1 = (df_transporte['fields.nombre'][i],df_transporte['fields.coddistrit'][i])
+  cursor.execute(postgres_insert_query, record_to_insert1)
+
+#Insertar datos en tabla Transporte
+for i in range(len(df_superficie)):
+  postgres_insert_query = """ INSERT INTO Superficie (coddistrit,superficie) VALUES (%s,%s)"""
+  record_to_insert1 = (str(df_superficie.iloc[i]['Coddistrit'])[:-2],df_superficie.iloc[i]['Superficie'])
+  cursor.execute(postgres_insert_query, record_to_insert1)
 connection.commit()
-
-
-
-
-
